@@ -4,8 +4,8 @@ public class CameraController : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float panSpeed = 20f;
-    [SerializeField] private float zoomSpeed = 2f;
-    [SerializeField] private float minZoom = 10f;
+    [SerializeField] private float zoomSpeed = 0.5f;
+    [SerializeField] private float minZoom = 5f;
     [SerializeField] private float maxZoom = 50f;
     
     [Header("Boundaries")]
@@ -16,15 +16,14 @@ public class CameraController : MonoBehaviour
 
     private Camera mainCamera;
     private Vector3 lastPanPosition;
-    private Vector2 lastZoomPosition1;
-    private Vector2 lastZoomPosition2;
-    private float initialZoomDistance;
-    private float targetZoom;
+    private float currentZoom;
+    private bool isOrtho;
 
     private void Start()
     {
         mainCamera = GetComponent<Camera>();
-        targetZoom = mainCamera.orthographicSize;
+        isOrtho = mainCamera.orthographic;
+        currentZoom = isOrtho ? mainCamera.orthographicSize : mainCamera.transform.position.y;
     }
 
     private void Update()
@@ -63,23 +62,27 @@ public class CameraController : MonoBehaviour
             Touch touch1 = Input.GetTouch(0);
             Touch touch2 = Input.GetTouch(1);
 
-            if (touch1.phase == TouchPhase.Began || touch2.phase == TouchPhase.Began)
-            {
-                lastZoomPosition1 = touch1.position;
-                lastZoomPosition2 = touch2.position;
-                initialZoomDistance = Vector2.Distance(touch1.position, touch2.position);
-            }
-            else if (touch1.phase == TouchPhase.Moved || touch2.phase == TouchPhase.Moved)
-            {
-                float currentZoomDistance = Vector2.Distance(touch1.position, touch2.position);
-                float deltaDistance = currentZoomDistance - initialZoomDistance;
-                
-                // Calculate new zoom
-                targetZoom -= deltaDistance * zoomSpeed * Time.deltaTime;
-                targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
-                mainCamera.orthographicSize = targetZoom;
+            // Get the magnitude of the vector between touch points
+            float previousDistance = Vector2.Distance(
+                touch1.position - touch1.deltaPosition,
+                touch2.position - touch2.deltaPosition);
+            float currentDistance = Vector2.Distance(touch1.position, touch2.position);
 
-                initialZoomDistance = currentZoomDistance;
+            // Calculate the zoom magnitude based on the change in distance
+            float delta = previousDistance - currentDistance;
+
+            // Apply zoom
+            if (isOrtho)
+            {
+                currentZoom = Mathf.Clamp(mainCamera.orthographicSize + delta * zoomSpeed, minZoom, maxZoom);
+                mainCamera.orthographicSize = currentZoom;
+            }
+            else
+            {
+                Vector3 pos = transform.position;
+                pos.y = Mathf.Clamp(pos.y + delta * zoomSpeed, minZoom, maxZoom);
+                transform.position = pos;
+                currentZoom = pos.y;
             }
         }
     }
